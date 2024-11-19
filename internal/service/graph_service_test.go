@@ -27,13 +27,8 @@ func TestGetAllNodes(t *testing.T) {
 		{NodeId: 2, NodeLabels: []string{"Node2"}},
 	}
 
-	// Настройка ожиданий
 	mockRepo.EXPECT().GetAllNodes(ctx).Return(expectedNodes, nil)
-
-	// Вызов метода сервиса
 	nodes, err := service.GetAllNodes(ctx)
-
-	// Проверка результатов
 	assert.NoError(t, err)
 	assert.Equal(t, expectedNodes, nodes)
 }
@@ -48,13 +43,8 @@ func TestGetAllNodes_Error(t *testing.T) {
 
 	mockError := errors.New("repository error")
 
-	// Настройка ожиданий
 	mockRepo.EXPECT().GetAllNodes(ctx).Return(nil, mockError)
-
-	// Вызов метода сервиса
 	nodes, err := service.GetAllNodes(ctx)
-
-	// Проверка результатов
 	assert.Error(t, err)
 	assert.Equal(t, mockError, err)
 	assert.Nil(t, nodes)
@@ -80,13 +70,8 @@ func TestGetNodeWithRelationships(t *testing.T) {
 		},
 	}
 
-	// Настройка ожиданий
 	mockRepo.EXPECT().GetNodeWithRelationships(ctx, request).Return(expectedResponse, nil)
-
-	// Вызов метода сервиса
 	response, err := service.GetNodeWithRelationships(ctx, request)
-
-	// Проверка результатов
 	assert.NoError(t, err)
 	assert.Equal(t, expectedResponse, response)
 }
@@ -127,13 +112,8 @@ func TestCreateNodeAndRelationship(t *testing.T) {
 		CreatedRelatedNode:  createMockNode(4, []string{"Node4"}),
 	}
 
-	// Настройка ожиданий
 	mockRepo.EXPECT().CreateNodeAndRelationship(ctx, request).Return(expectedResponse, nil)
-
-	// Вызов метода сервиса
 	response, err := service.CreateNodeAndRelationship(ctx, request)
-
-	// Проверка результатов
 	assert.NoError(t, err)
 	assert.Equal(t, expectedResponse, response)
 }
@@ -150,13 +130,8 @@ func TestDeleteNodeAndRelationships(t *testing.T) {
 		NodeId: 1,
 	}
 
-	// Настройка ожиданий
 	mockRepo.EXPECT().DeleteNodeAndRelationships(ctx, request).Return(nil)
-
-	// Вызов метода сервиса
 	err := service.DeleteNodeAndRelationships(ctx, request)
-
-	// Проверка результатов
 	assert.NoError(t, err)
 }
 
@@ -174,29 +149,21 @@ func TestDeleteNodeAndRelationships_Error(t *testing.T) {
 
 	mockError := errors.New("delete error")
 
-	// Настройка ожиданий
 	mockRepo.EXPECT().DeleteNodeAndRelationships(ctx, request).Return(mockError)
-
-	// Вызов метода сервиса
 	err := service.DeleteNodeAndRelationships(ctx, request)
-
-	// Проверка результатов
 	assert.Error(t, err)
 	assert.Equal(t, mockError, err)
 }
 
-// Вспомогательные функции для создания моков neo4j.Node и neo4j.Relationship
 func createMockNode(id int64, labels []string) neo4j.Node {
 	return neo4j.Node{
 		Id:     id,
 		Labels: labels,
-		// Дополните другие поля, если необходимо
 	}
 }
 
 func createMockRelationship(relType string) neo4j.Relationship {
 	return neo4j.Relationship{
 		Type: relType,
-		// Дополните другие поля, если необходимо
 	}
 }

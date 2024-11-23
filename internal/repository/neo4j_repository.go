@@ -29,7 +29,11 @@ func (s *Neo4jStorage) GetAllNodes(ctx context.Context) ([]models.GetAllNodesRes
 	session := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer session.Close(ctx)
 
-	result, err := session.Run(ctx, "MATCH (n) RETURN id(n) AS nodeId, labels(n) AS nodeLabels", nil)
+	query := `
+		MATCH (n)
+		RETURN n.id AS id, labels(n) AS label, n.name AS name, n.screen_name AS screen_name, n.sex AS sex, n.city AS city
+	`
+	result, err := session.Run(ctx, query, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -37,30 +41,21 @@ func (s *Neo4jStorage) GetAllNodes(ctx context.Context) ([]models.GetAllNodesRes
 	var responses []models.GetAllNodesResponse
 	for result.Next(ctx) {
 		record := result.Record()
-		nodeId, ok := record.Get("nodeId")
-		if !ok {
-			continue
-		}
-		nodeLabelsInterface, ok := record.Get("nodeLabels")
-		if !ok {
-			continue
-		}
-		nodeLabelsSlice, ok := nodeLabelsInterface.([]interface{})
-		if !ok {
-			continue
-		}
-		nodeLabels := make([]string, len(nodeLabelsSlice))
-		for i, v := range nodeLabelsSlice {
-			if label, ok := v.(string); ok {
-				nodeLabels[i] = label
-			} else {
-				return nil, fmt.Errorf("expected string label but got %T", v)
-			}
+		id, _ := record.Get("id")
+		label, _ := record.Get("label")
+		name, _ := record.Get("name")
+
+		var namePtr *string
+
+		if name != nil {
+			nameStr := name.(string)
+			namePtr = &nameStr
 		}
 
 		responses = append(responses, models.GetAllNodesResponse{
-			NodeId:     nodeId.(int64),
-			NodeLabels: nodeLabels,
+			ID:    id.(int64),
+			Label: label.([]interface{})[0].(string),
+			Name:  namePtr,
 		})
 	}
 
@@ -71,105 +66,139 @@ func (s *Neo4jStorage) GetAllNodes(ctx context.Context) ([]models.GetAllNodesRes
 	return responses, nil
 }
 
-func (s *Neo4jStorage) GetNodeWithRelationships(ctx context.Context, req models.GetNodeWithRelationshipsRequest) ([]models.GetNodeWithRelationshipsResponse, error) {
+func (s *Neo4jStorage) GetAllRelationships(ctx context.Context) ([]models.GetAllRelationshipsResponse, error) {
 	session := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer session.Close(ctx)
 
-	result, err := session.Run(ctx, "MATCH (n)-[r]->(m) WHERE id(n) = $nodeId RETURN n, r, m", map[string]interface{}{
-		"nodeId": req.NodeId,
-	})
+	query := `
+		MATCH (n)-[r]->(m)
+		RETURN n.id AS start_node_id, type(r) AS relationship_type, m.id AS end_node_id, m
+	`
+	result, err := session.Run(ctx, query, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	var responses []models.GetNodeWithRelationshipsResponse
+	var responses []models.GetAllRelationshipsResponse
 	for result.Next(ctx) {
 		record := result.Record()
-		n, _ := record.Get("n")
-		r, _ := record.Get("r")
-		m, _ := record.Get("m")
-		responses = append(responses, models.GetNodeWithRelationshipsResponse{
-			Node:         n.(neo4j.Node),
-			Relationship: r.(neo4j.Relationship),
-			TargetNode:   m.(neo4j.Node),
+		startNodeID, _ := record.Get("start_node_id")
+		relationshipType, _ := record.Get("relationship_type")
+		endNodeID, _ := record.Get("end_node_id")
+		endNode, _ := record.Get("m")
+
+		responses = append(responses, models.GetAllRelationshipsResponse{
+			StartNodeID:      startNodeID.(int64),
+			RelationshipType: relationshipType.(string),
+			EndNodeID:        endNodeID.(int64),
+			EndNode:          endNode.(neo4j.Node),
 		})
 	}
 
 	if err = result.Err(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("get all relationships: %w", err)
 	}
 
 	return responses, nil
 }
 
-// CreateNodeAndRelationship - создание узла и связи
-// CreateNodeAndRelationship - создание узла и связи
-func (s *Neo4jStorage) CreateNodeAndRelationship(ctx context.Context, req models.CreateNodeAndRelationshipRequest) (models.CreateNodeAndRelationshipResponse, error) {
-	session := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+func (s *Neo4jStorage) GetNodeWithRelationships(ctx context.Context, nodeID int64) (models.NodeWithRelationships, error) {
+	session := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer session.Close(ctx)
 
-	// Формируем запрос Cypher с использованием RelationshipType
-	cypherQuery := `
-		CREATE (n:Label $nodeProps)-[r:%s $relProps]->(m:AnotherLabel $relatedNodeProps)
-		RETURN n, r, m
+	query := `
+		MATCH (n {id: $id})-[r]->(m)
+		RETURN n, type(r) AS relationship_type, m
 	`
-	cypherQuery = fmt.Sprintf(cypherQuery, req.RelationshipType)
-
-	// Преобразуем свойства для передачи в запрос
-	nodeProps := map[string]interface{}{
-		"city":        req.NodeProps.City,
-		"screen_name": req.NodeProps.ScreenName,
-		"sex":         req.NodeProps.Sex,
-		"name":        req.NodeProps.Name,
-		"id":          req.NodeProps.ID,
-	}
-
-	relatedNodeProps := map[string]interface{}{
-		"city":        req.RelatedNodeProps.City,
-		"screen_name": req.RelatedNodeProps.ScreenName,
-		"sex":         req.RelatedNodeProps.Sex,
-		"name":        req.RelatedNodeProps.Name,
-		"id":          req.RelatedNodeProps.ID,
-	}
-
-	relProps := map[string]interface{}{
-		"since":                req.RelationshipProps.Since,
-		"relationshipStrength": req.RelationshipProps.RelationshipStrength,
-	}
-
-	// Выполняем запрос
-	result, err := session.Run(ctx, cypherQuery, map[string]interface{}{
-		"nodeProps":        nodeProps,
-		"relProps":         relProps,
-		"relatedNodeProps": relatedNodeProps,
-	})
+	result, err := session.Run(ctx, query, map[string]interface{}{"id": nodeID})
 	if err != nil {
-		return models.CreateNodeAndRelationshipResponse{}, fmt.Errorf("create node and relationship: %w", err)
+		return models.NodeWithRelationships{}, err
 	}
 
-	// Извлекаем результаты
-	if result.Next(ctx) {
+	var node models.Node
+	var relationships []models.Relationship
+
+	for result.Next(ctx) {
 		record := result.Record()
 		n, _ := record.Get("n")
-		r, _ := record.Get("r")
+		relType, _ := record.Get("relationship_type")
 		m, _ := record.Get("m")
-		return models.CreateNodeAndRelationshipResponse{
-			CreatedNode:         n.(neo4j.Node),
-			CreatedRelationship: r.(neo4j.Relationship),
-			CreatedRelatedNode:  m.(neo4j.Node),
-		}, nil
+
+		nodeMap := n.(neo4j.Node).Props
+		node = models.Node{
+			ID:    nodeMap["id"].(int64),
+			Label: n.(neo4j.Node).Labels[0],
+		}
+		if name, ok := nodeMap["name"].(string); ok {
+			node.Name = &name
+		}
+		if screenName, ok := nodeMap["screen_name"].(string); ok {
+			node.ScreenName = &screenName
+		}
+		if sex, ok := nodeMap["sex"].(int64); ok {
+			sexInt := int(sex)
+			node.Sex = &sexInt
+		}
+		if city, ok := nodeMap["city"].(string); ok {
+			node.City = &city
+		}
+
+		// Преобразование связи
+		endNode := m.(neo4j.Node)
+		relationship := models.Relationship{
+			Type:      relType.(string),
+			EndNodeID: endNode.Props["id"].(int64),
+		}
+		relationships = append(relationships, relationship)
 	}
 
-	return models.CreateNodeAndRelationshipResponse{}, fmt.Errorf("no record found")
+	if err = result.Err(); err != nil {
+		return models.NodeWithRelationships{}, fmt.Errorf("get node with relationships: %w", err)
+	}
+
+	return models.NodeWithRelationships{Node: node, Relationships: relationships}, nil
 }
 
-// DeleteNodeAndRelationships - удаление узла и его связей
-func (s *Neo4jStorage) DeleteNodeAndRelationships(ctx context.Context, req models.DeleteNodeAndRelationshipsRequest) error {
+func (s *Neo4jStorage) AddNodeAndRelationships(ctx context.Context, req models.AddNodeAndRelationshipsRequest) error {
 	session := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer session.Close(ctx)
 
-	_, err := session.Run(ctx, "MATCH (n) WHERE id(n) = $nodeId DETACH DELETE n", map[string]interface{}{
-		"nodeId": req.NodeId,
-	})
-	return err
+	query := `
+		MERGE (n:User {id: $id})
+		SET n.name = $name, n.screen_name = $screen_name, n.sex = $sex, n.city = $city
+		UNWIND $relationships AS rel
+		MATCH (m:User {id: rel.end_node_id})
+		MERGE (n)-[:FOLLOW]->(m)
+	`
+	params := map[string]interface{}{
+		"id":            req.Node.ID,
+		"name":          req.Node.Name,
+		"screen_name":   req.Node.ScreenName,
+		"sex":           req.Node.Sex,
+		"city":          req.Node.City,
+		"relationships": req.Relationships,
+	}
+
+	_, err := session.Run(ctx, query, params)
+	if err != nil {
+		return fmt.Errorf("add node and relationships: %w", err)
+	}
+
+	return nil
+}
+
+func (s *Neo4jStorage) DeleteNodeAndRelationships(ctx context.Context, nodeID int64) error {
+	session := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	defer session.Close(ctx)
+
+	query := `
+		MATCH (n {id: $id})
+		DETACH DELETE n
+	`
+	_, err := session.Run(ctx, query, map[string]interface{}{"id": nodeID})
+	if err != nil {
+		return fmt.Errorf("delete node and relationships: %w", err)
+	}
+
+	return nil
 }

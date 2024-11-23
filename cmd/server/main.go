@@ -7,6 +7,7 @@ import (
 	"github.com/ZetoOfficial/neo4j-server/internal/delivery/http"
 	"github.com/ZetoOfficial/neo4j-server/internal/repository"
 	"github.com/ZetoOfficial/neo4j-server/internal/service"
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 )
@@ -29,6 +30,7 @@ func main() {
 	handler := http.NewHandler(svc)
 
 	router := gin.Default()
+	router.Use(cors.Default())
 	handler.RegisterRoutes(router)
 
 	if err := router.Run(cfg.HTTPPort); err != nil {

@@ -19,14 +19,18 @@ func (u *graphService) GetAllNodes(ctx context.Context) ([]models.GetAllNodesRes
 	return u.repo.GetAllNodes(ctx)
 }
 
-func (u *graphService) GetNodeWithRelationships(ctx context.Context, req models.GetNodeWithRelationshipsRequest) ([]models.GetNodeWithRelationshipsResponse, error) {
-	return u.repo.GetNodeWithRelationships(ctx, req)
+func (u *graphService) GetAllRelationships(ctx context.Context) ([]models.GetAllRelationshipsResponse, error) {
+	return u.repo.GetAllRelationships(ctx)
 }
 
-func (u *graphService) CreateNodeAndRelationship(ctx context.Context, req models.CreateNodeAndRelationshipRequest) (models.CreateNodeAndRelationshipResponse, error) {
-	return u.repo.CreateNodeAndRelationship(ctx, req)
+func (u *graphService) GetNodeWithRelationships(ctx context.Context, nodeID int64) (models.NodeWithRelationships, error) {
+	return u.repo.GetNodeWithRelationships(ctx, nodeID)
 }
 
-func (u *graphService) DeleteNodeAndRelationships(ctx context.Context, req models.DeleteNodeAndRelationshipsRequest) error {
-	return u.repo.DeleteNodeAndRelationships(ctx, req)
+func (u *graphService) AddNodeAndRelationships(ctx context.Context, req models.AddNodeAndRelationshipsRequest) error {
+	return u.repo.AddNodeAndRelationships(ctx, req)
+}
+
+func (u *graphService) DeleteNodeAndRelationships(ctx context.Context, nodeID int64) error {
+	return u.repo.DeleteNodeAndRelationships(ctx, nodeID)
 }

@@ -8,7 +8,8 @@ import (
 
 type GraphService interface {
 	GetAllNodes(ctx context.Context) ([]models.GetAllNodesResponse, error)
-	GetNodeWithRelationships(ctx context.Context, req models.GetNodeWithRelationshipsRequest) ([]models.GetNodeWithRelationshipsResponse, error)
-	CreateNodeAndRelationship(ctx context.Context, req models.CreateNodeAndRelationshipRequest) (models.CreateNodeAndRelationshipResponse, error)
-	DeleteNodeAndRelationships(ctx context.Context, req models.DeleteNodeAndRelationshipsRequest) error
+	GetAllRelationships(ctx context.Context) ([]models.GetAllRelationshipsResponse, error)
+	GetNodeWithRelationships(ctx context.Context, nodeID int64) (models.NodeWithRelationships, error)
+	AddNodeAndRelationships(ctx context.Context, req models.AddNodeAndRelationshipsRequest) error
+	DeleteNodeAndRelationships(ctx context.Context, nodeID int64) error
 }

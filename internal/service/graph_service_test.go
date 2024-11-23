@@ -1,169 +1,179 @@
-package service_test
+package service
 
 import (
 	"context"
 	"errors"
 	"testing"
 
-	"github.com/ZetoOfficial/neo4j-server/internal/models"
-	"github.com/ZetoOfficial/neo4j-server/internal/service"
-	"github.com/ZetoOfficial/neo4j-server/internal/service/mocks"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"github.com/stretchr/testify/assert"
-
 	"go.uber.org/mock/gomock"
+
+	"github.com/ZetoOfficial/neo4j-server/internal/models"
+	"github.com/ZetoOfficial/neo4j-server/internal/repository/mocks"
 )
 
-func TestGetAllNodes(t *testing.T) {
+func TestGraphService_GetAllNodes(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockRepo := mocks.NewMockGraphService(ctrl)
-	service := service.NewGraphService(mockRepo)
-	ctx := context.Background()
+	mockRepo := mocks.NewMockRepository(ctrl)
+	service := NewGraphService(mockRepo)
 
+	ctx := context.Background()
 	expectedNodes := []models.GetAllNodesResponse{
-		{NodeId: 1, NodeLabels: []string{"Node1"}},
-		{NodeId: 2, NodeLabels: []string{"Node2"}},
+		{
+			ID:    1,
+			Label: "Person",
+			Name:  stringPointer("Alice"),
+		},
+		{
+			ID:    2,
+			Label: "Company",
+			Name:  stringPointer("Acme Corp"),
+		},
 	}
 
 	mockRepo.EXPECT().GetAllNodes(ctx).Return(expectedNodes, nil)
+
 	nodes, err := service.GetAllNodes(ctx)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedNodes, nodes)
 }
 
-func TestGetAllNodes_Error(t *testing.T) {
+func TestGraphService_GetAllRelationships(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockRepo := mocks.NewMockGraphService(ctrl)
-	service := service.NewGraphService(mockRepo)
+	mockRepo := mocks.NewMockRepository(ctrl)
+	service := NewGraphService(mockRepo)
+
 	ctx := context.Background()
+	expectedRelationships := []models.GetAllRelationshipsResponse{
+		{
+			StartNodeID:      1,
+			RelationshipType: "FRIEND",
+			EndNodeID:        2,
+			EndNode:          mockNeo4jNode(2, "Person", "Bob"),
+		},
+	}
 
-	mockError := errors.New("repository error")
+	mockRepo.EXPECT().GetAllRelationships(ctx).Return(expectedRelationships, nil)
 
-	mockRepo.EXPECT().GetAllNodes(ctx).Return(nil, mockError)
+	relationships, err := service.GetAllRelationships(ctx)
+	assert.NoError(t, err)
+	assert.Equal(t, expectedRelationships, relationships)
+}
+
+func TestGraphService_GetNodeWithRelationships(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockRepo := mocks.NewMockRepository(ctrl)
+	service := NewGraphService(mockRepo)
+
+	ctx := context.Background()
+	nodeID := int64(1)
+	expectedResult := models.NodeWithRelationships{
+		Node: models.Node{
+			ID:         1,
+			Label:      "Person",
+			Name:       stringPointer("Alice"),
+			ScreenName: stringPointer("alice123"),
+			Sex:        intPointer(1),
+			City:       stringPointer("New York"),
+		},
+		Relationships: []models.Relationship{
+			{
+				Type:      "FRIEND",
+				EndNodeID: 2,
+			},
+		},
+	}
+
+	mockRepo.EXPECT().GetNodeWithRelationships(ctx, nodeID).Return(expectedResult, nil)
+
+	result, err := service.GetNodeWithRelationships(ctx, nodeID)
+	assert.NoError(t, err)
+	assert.Equal(t, expectedResult, result)
+}
+
+func TestGraphService_AddNodeAndRelationships(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockRepo := mocks.NewMockRepository(ctrl)
+	service := NewGraphService(mockRepo)
+
+	ctx := context.Background()
+	req := models.AddNodeAndRelationshipsRequest{
+		Node: models.Node{
+			ID:    1,
+			Label: "Person",
+			Name:  stringPointer("Alice"),
+		},
+		Relationships: []models.Relationship{
+			{
+				Type:      "FRIEND",
+				EndNodeID: 2,
+			},
+		},
+	}
+
+	mockRepo.EXPECT().AddNodeAndRelationships(ctx, req).Return(nil)
+
+	err := service.AddNodeAndRelationships(ctx, req)
+	assert.NoError(t, err)
+}
+
+func TestGraphService_DeleteNodeAndRelationships(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockRepo := mocks.NewMockRepository(ctrl)
+	service := NewGraphService(mockRepo)
+
+	ctx := context.Background()
+	nodeID := int64(1)
+
+	mockRepo.EXPECT().DeleteNodeAndRelationships(ctx, nodeID).Return(nil)
+	err := service.DeleteNodeAndRelationships(ctx, nodeID)
+	assert.NoError(t, err)
+}
+
+func TestGraphService_GetAllNodes_Error(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockRepo := mocks.NewMockRepository(ctrl)
+	service := NewGraphService(mockRepo)
+
+	ctx := context.Background()
+	expectedError := errors.New("failed to get all nodes")
+
+	mockRepo.EXPECT().GetAllNodes(ctx).Return(nil, expectedError)
+
 	nodes, err := service.GetAllNodes(ctx)
 	assert.Error(t, err)
-	assert.Equal(t, mockError, err)
+	assert.Equal(t, expectedError, err)
 	assert.Nil(t, nodes)
 }
 
-func TestGetNodeWithRelationships(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockRepo := mocks.NewMockGraphService(ctrl)
-	service := service.NewGraphService(mockRepo)
-	ctx := context.Background()
-
-	request := models.GetNodeWithRelationshipsRequest{
-		NodeId: 1,
-	}
-
-	expectedResponse := []models.GetNodeWithRelationshipsResponse{
-		{
-			Node:         createMockNode(1, []string{"Node1"}),
-			Relationship: createMockRelationship("CONNECTED_TO"),
-			TargetNode:   createMockNode(2, []string{"Node2"}),
-		},
-	}
-
-	mockRepo.EXPECT().GetNodeWithRelationships(ctx, request).Return(expectedResponse, nil)
-	response, err := service.GetNodeWithRelationships(ctx, request)
-	assert.NoError(t, err)
-	assert.Equal(t, expectedResponse, response)
+func stringPointer(s string) *string {
+	return &s
 }
 
-func TestCreateNodeAndRelationship(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockRepo := mocks.NewMockGraphService(ctrl)
-	service := service.NewGraphService(mockRepo)
-	ctx := context.Background()
-
-	request := models.CreateNodeAndRelationshipRequest{
-		NodeProps: models.NodeProperties{
-			City:       "New York",
-			ScreenName: "user123",
-			Sex:        1,
-			Name:       "John Doe",
-			ID:         3,
-		},
-		RelationshipType: "CONNECTED_TO",
-		RelationshipProps: models.RelationshipProperties{
-			Since:                2020,
-			RelationshipStrength: "Strong",
-		},
-		RelatedNodeProps: models.NodeProperties{
-			City:       "Los Angeles",
-			ScreenName: "user456",
-			Sex:        2,
-			Name:       "Jane Smith",
-			ID:         4,
-		},
-	}
-
-	expectedResponse := models.CreateNodeAndRelationshipResponse{
-		CreatedNode:         createMockNode(3, []string{"Node3"}),
-		CreatedRelationship: createMockRelationship("CONNECTED_TO"),
-		CreatedRelatedNode:  createMockNode(4, []string{"Node4"}),
-	}
-
-	mockRepo.EXPECT().CreateNodeAndRelationship(ctx, request).Return(expectedResponse, nil)
-	response, err := service.CreateNodeAndRelationship(ctx, request)
-	assert.NoError(t, err)
-	assert.Equal(t, expectedResponse, response)
+func intPointer(i int) *int {
+	return &i
 }
 
-func TestDeleteNodeAndRelationships(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockRepo := mocks.NewMockGraphService(ctrl)
-	service := service.NewGraphService(mockRepo)
-	ctx := context.Background()
-
-	request := models.DeleteNodeAndRelationshipsRequest{
-		NodeId: 1,
+func mockNeo4jNode(id int64, label, name string) neo4j.Node {
+	props := map[string]interface{}{
+		"name": name,
 	}
-
-	mockRepo.EXPECT().DeleteNodeAndRelationships(ctx, request).Return(nil)
-	err := service.DeleteNodeAndRelationships(ctx, request)
-	assert.NoError(t, err)
-}
-
-func TestDeleteNodeAndRelationships_Error(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockRepo := mocks.NewMockGraphService(ctrl)
-	service := service.NewGraphService(mockRepo)
-	ctx := context.Background()
-
-	request := models.DeleteNodeAndRelationshipsRequest{
-		NodeId: 1,
-	}
-
-	mockError := errors.New("delete error")
-
-	mockRepo.EXPECT().DeleteNodeAndRelationships(ctx, request).Return(mockError)
-	err := service.DeleteNodeAndRelationships(ctx, request)
-	assert.Error(t, err)
-	assert.Equal(t, mockError, err)
-}
-
-func createMockNode(id int64, labels []string) neo4j.Node {
 	return neo4j.Node{
 		Id:     id,
-		Labels: labels,
-	}
-}
-
-func createMockRelationship(relType string) neo4j.Relationship {
-	return neo4j.Relationship{
-		Type: relType,
+		Labels: []string{label},
+		Props:  props,
 	}
 }

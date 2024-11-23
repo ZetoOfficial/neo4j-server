@@ -1,0 +1,316 @@
+openapi: 3.0.0
+info:
+  title: Neo4j Server API
+  version: 1.0.0
+  description: API documentation for the Neo4j Server managing nodes and relationships.
+servers:
+  - url: http://localhost:8129
+    description: Local server
+
+paths:
+  /api/nodes:
+    get:
+      summary: Retrieve all nodes
+      tags:
+        - Nodes
+      responses:
+        "200":
+          description: A list of nodes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/GetAllNodesResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    post:
+      summary: Add a new node with relationships
+      tags:
+        - Nodes
+      security:
+        - bearerAuth: []
+      requestBody:
+        description: Node and relationships to add
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddNodeAndRelationshipsRequest"
+      responses:
+        "201":
+          description: Node and relationships created successfully
+        "400":
+          description: Invalid request body
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/relationships:
+    get:
+      summary: Retrieve all relationships
+      tags:
+        - Relationships
+      responses:
+        "200":
+          description: A list of relationships
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/GetAllRelationshipsResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/nodes/{id}:
+    get:
+      summary: Retrieve a node with its relationships by ID
+      tags:
+        - Nodes
+      parameters:
+        - name: id
+          in: path
+          description: ID of the node to retrieve
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: Node with relationships
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NodeWithRelationships"
+        "400":
+          description: Invalid node ID supplied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      summary: Delete a node and its relationships by ID
+      tags:
+        - Nodes
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          description: ID of the node to delete
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "204":
+          description: Node and relationships deleted successfully
+        "400":
+          description: Invalid node ID supplied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message
+      example:
+        error: "Invalid ID"
+
+    GetAllNodesResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: Unique identifier of the node
+        label:
+          type: string
+          description: Label of the node
+        name:
+          type: string
+          description: Name of the node
+          nullable: true
+      required:
+        - id
+        - label
+      example:
+        id: 1
+        label: "Person"
+        name: "Alice"
+
+    GetAllRelationshipsResponse:
+      type: object
+      properties:
+        start_node_id:
+          type: integer
+          format: int64
+          description: ID of the starting node
+        relationship_type:
+          type: string
+          description: Type of the relationship
+        end_node_id:
+          type: integer
+          format: int64
+          description: ID of the ending node
+        end_node:
+          $ref: "#/components/schemas/Node"
+      required:
+        - start_node_id
+        - relationship_type
+        - end_node_id
+        - end_node
+      example:
+        start_node_id: 1
+        relationship_type: "FRIENDS_WITH"
+        end_node_id: 2
+        end_node:
+          id: 2
+          label: "Person"
+          name: "Bob"
+
+    AddNodeAndRelationshipsRequest:
+      type: object
+      properties:
+        node:
+          $ref: "#/components/schemas/Node"
+        relationships:
+          type: array
+          items:
+            $ref: "#/components/schemas/Relationship"
+      required:
+        - node
+        - relationships
+      example:
+        node:
+          id: 3
+          label: "Person"
+          name: "Charlie"
+          screen_name: "charlie123"
+          sex: 1
+          city: "New York"
+        relationships:
+          - type: "KNOWS"
+            end_node_id: 1
+          - type: "WORKS_AT"
+            end_node_id: 4
+
+    Node:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: Unique identifier of the node
+        label:
+          type: string
+          description: Label of the node
+        name:
+          type: string
+          description: Name of the node
+          nullable: true
+        screen_name:
+          type: string
+          description: Screen name of the node
+          nullable: true
+        sex:
+          type: integer
+          description: Sex of the node (e.g., 0 for female, 1 for male)
+          nullable: true
+        city:
+          type: string
+          description: City of the node
+          nullable: true
+      required:
+        - id
+        - label
+      example:
+        id: 1
+        label: "Person"
+        name: "Alice"
+        screen_name: "alice_w"
+        sex: 0
+        city: "Wonderland"
+
+    Relationship:
+      type: object
+      properties:
+        type:
+          type: string
+          description: Type of the relationship
+        end_node_id:
+          type: integer
+          format: int64
+          description: ID of the ending node
+      required:
+        - type
+        - end_node_id
+      example:
+        type: "FRIENDS_WITH"
+        end_node_id: 2
+
+    NodeWithRelationships:
+      type: object
+      properties:
+        node:
+          $ref: "#/components/schemas/Node"
+        relationships:
+          type: array
+          items:
+            $ref: "#/components/schemas/Relationship"
+      required:
+        - node
+        - relationships
+      example:
+        node:
+          id: 1
+          label: "Person"
+          name: "Alice"
+          screen_name: "alice_w"
+          sex: 0
+          city: "Wonderland"
+        relationships:
+          - type: "FRIENDS_WITH"
+            end_node_id: 2
+          - type: "WORKS_AT"
+            end_node_id: 4

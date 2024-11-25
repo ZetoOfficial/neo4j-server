@@ -14,6 +14,10 @@ type GetAllRelationshipsResponse struct {
 	EndNodeID        int64      `json:"end_node_id"`
 	EndNode          neo4j.Node `json:"end_node"`
 }
+type GetNodeWithRelationshipsResponse struct {
+	Node          Node           `json:"node"`
+	Relationships []Relationship `json:"relationships"`
+}
 
 type AddNodeAndRelationshipsRequest struct {
 	Node          Node           `json:"node"`

@@ -100,10 +100,10 @@ func (mr *MockRepositoryMockRecorder) GetAllRelationships(ctx any) *gomock.Call 
 }
 
 // GetNodeWithRelationships mocks base method.
-func (m *MockRepository) GetNodeWithRelationships(ctx context.Context, nodeID int64) (models.NodeWithRelationships, error) {
+func (m *MockRepository) GetNodeWithRelationships(ctx context.Context, nodeID int64) (models.GetNodeWithRelationshipsResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetNodeWithRelationships", ctx, nodeID)
-	ret0, _ := ret[0].(models.NodeWithRelationships)
+	ret0, _ := ret[0].(models.GetNodeWithRelationshipsResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

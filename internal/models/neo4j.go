@@ -13,8 +13,3 @@ type Relationship struct {
 	Type      string `json:"type"`
 	EndNodeID int64  `json:"end_node_id"`
 }
-
-type NodeWithRelationships struct {
-	Node          Node           `json:"node"`
-	Relationships []Relationship `json:"relationships"`
-}

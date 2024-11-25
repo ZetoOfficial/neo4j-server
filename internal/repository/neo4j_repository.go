@@ -102,7 +102,7 @@ func (s *Neo4jStorage) GetAllRelationships(ctx context.Context) ([]models.GetAll
 	return responses, nil
 }
 
-func (s *Neo4jStorage) GetNodeWithRelationships(ctx context.Context, nodeID int64) (models.NodeWithRelationships, error) {
+func (s *Neo4jStorage) GetNodeWithRelationships(ctx context.Context, nodeID int64) (models.GetNodeWithRelationshipsResponse, error) {
 	session := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer session.Close(ctx)
 
@@ -112,7 +112,7 @@ func (s *Neo4jStorage) GetNodeWithRelationships(ctx context.Context, nodeID int6
 	`
 	result, err := session.Run(ctx, query, map[string]interface{}{"id": nodeID})
 	if err != nil {
-		return models.NodeWithRelationships{}, err
+		return models.GetNodeWithRelationshipsResponse{}, err
 	}
 
 	var node models.Node
@@ -153,10 +153,10 @@ func (s *Neo4jStorage) GetNodeWithRelationships(ctx context.Context, nodeID int6
 	}
 
 	if err = result.Err(); err != nil {
-		return models.NodeWithRelationships{}, fmt.Errorf("get node with relationships: %w", err)
+		return models.GetNodeWithRelationshipsResponse{}, fmt.Errorf("get node with relationships: %w", err)
 	}
 
-	return models.NodeWithRelationships{Node: node, Relationships: relationships}, nil
+	return models.GetNodeWithRelationshipsResponse{Node: node, Relationships: relationships}, nil
 }
 
 func (s *Neo4jStorage) AddNodeAndRelationships(ctx context.Context, req models.AddNodeAndRelationshipsRequest) error {

@@ -9,7 +9,7 @@ import (
 type Repository interface {
 	GetAllNodes(ctx context.Context) ([]models.GetAllNodesResponse, error)
 	GetAllRelationships(ctx context.Context) ([]models.GetAllRelationshipsResponse, error)
-	GetNodeWithRelationships(ctx context.Context, nodeID int64) (models.NodeWithRelationships, error)
+	GetNodeWithRelationships(ctx context.Context, nodeID int64) (models.GetNodeWithRelationshipsResponse, error)
 	AddNodeAndRelationships(ctx context.Context, req models.AddNodeAndRelationshipsRequest) error
 	DeleteNodeAndRelationships(ctx context.Context, nodeID int64) error
 }

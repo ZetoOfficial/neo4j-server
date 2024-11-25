@@ -23,7 +23,7 @@ func (u *graphService) GetAllRelationships(ctx context.Context) ([]models.GetAll
 	return u.repo.GetAllRelationships(ctx)
 }
 
-func (u *graphService) GetNodeWithRelationships(ctx context.Context, nodeID int64) (models.NodeWithRelationships, error) {
+func (u *graphService) GetNodeWithRelationships(ctx context.Context, nodeID int64) (models.GetNodeWithRelationshipsResponse, error) {
 	return u.repo.GetNodeWithRelationships(ctx, nodeID)
 }
 

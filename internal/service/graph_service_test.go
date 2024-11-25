@@ -74,7 +74,7 @@ func TestGraphService_GetNodeWithRelationships(t *testing.T) {
 
 	ctx := context.Background()
 	nodeID := int64(1)
-	expectedResult := models.NodeWithRelationships{
+	expectedResult := models.GetNodeWithRelationshipsResponse{
 		Node: models.Node{
 			ID:         1,
 			Label:      "Person",

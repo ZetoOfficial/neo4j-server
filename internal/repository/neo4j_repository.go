@@ -107,16 +107,16 @@ func (s *Neo4jStorage) GetNodeWithRelationships(ctx context.Context, nodeID int6
 	defer session.Close(ctx)
 
 	query := `
-		MATCH (n {id: $id})-[r]->(m)
-		RETURN n, type(r) AS relationship_type, m
-	`
+        MATCH (n {id: $id})-[r]-(m)
+        RETURN n, type(r) AS relationship_type, m
+    `
 	result, err := session.Run(ctx, query, map[string]interface{}{"id": nodeID})
 	if err != nil {
 		return models.GetNodeWithRelationshipsResponse{}, err
 	}
 
 	var node models.Node
-	var relationships []models.Relationship
+	relationshipsMap := make(map[int64]models.Relationship)
 
 	for result.Next(ctx) {
 		record := result.Record()
@@ -124,36 +124,48 @@ func (s *Neo4jStorage) GetNodeWithRelationships(ctx context.Context, nodeID int6
 		relType, _ := record.Get("relationship_type")
 		m, _ := record.Get("m")
 
-		nodeMap := n.(neo4j.Node).Props
-		node = models.Node{
-			ID:    nodeMap["id"].(int64),
-			Label: n.(neo4j.Node).Labels[0],
-		}
-		if name, ok := nodeMap["name"].(string); ok {
-			node.Name = &name
-		}
-		if screenName, ok := nodeMap["screen_name"].(string); ok {
-			node.ScreenName = &screenName
-		}
-		if sex, ok := nodeMap["sex"].(int64); ok {
-			sexInt := int(sex)
-			node.Sex = &sexInt
-		}
-		if city, ok := nodeMap["city"].(string); ok {
-			node.City = &city
+		// Process the main node
+		if node.ID == 0 {
+			nodeProps := n.(neo4j.Node).Props
+			node = models.Node{
+				ID:    nodeProps["id"].(int64),
+				Label: n.(neo4j.Node).Labels[0],
+			}
+			if name, ok := nodeProps["name"].(string); ok {
+				node.Name = &name
+			}
+			if screenName, ok := nodeProps["screen_name"].(string); ok {
+				node.ScreenName = &screenName
+			}
+			if sex, ok := nodeProps["sex"].(int64); ok {
+				sexInt := int(sex)
+				node.Sex = &sexInt
+			}
+			if city, ok := nodeProps["city"].(string); ok {
+				node.City = &city
+			}
 		}
 
-		// Преобразование связи
+		// Process the related node and relationship
 		endNode := m.(neo4j.Node)
-		relationship := models.Relationship{
-			Type:      relType.(string),
-			EndNodeID: endNode.Props["id"].(int64),
+		endNodeID := endNode.Props["id"].(int64)
+		if _, exists := relationshipsMap[endNodeID]; !exists {
+			relationship := models.Relationship{
+				Type:      relType.(string),
+				EndNodeID: endNodeID,
+			}
+			relationshipsMap[endNodeID] = relationship
 		}
-		relationships = append(relationships, relationship)
 	}
 
 	if err = result.Err(); err != nil {
 		return models.GetNodeWithRelationshipsResponse{}, fmt.Errorf("get node with relationships: %w", err)
+	}
+
+	// Convert map to slice
+	relationships := make([]models.Relationship, 0, len(relationshipsMap))
+	for _, rel := range relationshipsMap {
+		relationships = append(relationships, rel)
 	}
 
 	return models.GetNodeWithRelationshipsResponse{Node: node, Relationships: relationships}, nil
